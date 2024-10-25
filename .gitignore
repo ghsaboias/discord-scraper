@@ -1,0 +1,6 @@
+.env
+.venv
+output.txt
+channels.txt
+__pycache__/
+*.pyc
