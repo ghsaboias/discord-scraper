@@ -214,13 +214,22 @@ def get_channel_summary(channel_name, messages):
 
     Provide a concise report of the latest news updates from these messages. Focus on specific, recent events related to {channel_name}. For each update, include:
 
-    1. Date
+    1. Date of first mention (in YYYY-MM-DD HH:MM:SS format)
     2. Location
     3. Event description
     4. Parties involved
     5. Relevant numbers
 
-    Format each update as a bullet point. Use clear, direct language. Prioritize the most recent and significant events. If there are no specific news updates, state that clearly.
+    Important instructions:
+    - Format each update as a bullet point.
+    - Use clear, direct language.
+    - Include timestamp when that information was first mentioned.
+    - Do not include duplicate information. If a fact is mentioned multiple times, only report it once with the earliest timestamp.
+    - If there are no specific news updates, state that clearly.
+
+    Remember to include the timestamp of when each fact was first mentioned in the analyzed messages.
+    If there are two messages about the same event, aggregate them.
+    Don't forget to mention the source, be it a telegram channel, a news site, or a tweet.
     """
 
     try:
