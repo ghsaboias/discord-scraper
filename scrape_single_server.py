@@ -154,78 +154,54 @@ def get_channel_summary(channel_name, messages):
     BATCH_SIZE = 50
     message_batches = [messages[i:i + BATCH_SIZE] for i in range(0, len(messages), BATCH_SIZE)]
     
-    all_summaries = []
-    
-    system_prompt = """You are a news analyst specializing in creating structured reports from raw news data.
-Format your response in a clear, consistent structure:
+    system_prompt = """
+    You are an experienced news analyst tasked with summarizing a sequence of events from a series of messages. Your goal is to create a clear, concise, and objective summary that highlights the most critical events without repetition or unnecessary details.
 
-For each event:
-[TIME] HH:MM UTC
-[DATE] YYYY-MM-DD
-[LOCATION] Specific location of event
-[DESCRIPTION] 
-- Detailed event description
-- Context and background information
-- Key players and their roles
-- Implications and significance
+    ### Requirements:
 
-Order events chronologically. If exact time is unknown, estimate based on context and mark with '~'.
-Separate each event with a line break."""
+    1. **Format:**
+    - Begin with a summary title in the format "Event Type – Location (Date Range)" to give a clear overview of the topic and timeframe.
+    - Add a brief, one- or two-sentence summary encapsulating the overall situation.
+    - List events as bullet points with timestamps in the format `[HH:MM]`.
+    - For multiple events on the same day, group related updates together to avoid redundancy.
 
+    2. **Content Selection:**
+    - Include only essential events that significantly impact the overall narrative.
+    - Exclude minor details, repeated information, and unrelated messages.
+    - Ensure events are listed in chronological order from earliest to latest.
+
+    3. **Style and Tone:**
+    - Use objective, action-oriented language in each event description, focusing on what changed or happened.
+    - Specify unresolved details if outcomes or specifics are unknown, noting that the situation may still be developing.
+    - Maintain a neutral, factual, emotionless tone suitable for a broad audience.
+    """
+
+    all_content = []
     for batch_num, batch in enumerate(message_batches, 1):
         print(Fore.CYAN + f"Processing batch {batch_num}/{len(message_batches)}..." + Style.RESET_ALL)
         
-        content = f"""Analyze these messages from '{channel_name}' and create a structured report:
-
-        {'-' * 40}
-        """
+        batch_content = f"Messages from '{channel_name}':\n{'-' * 40}\n"
         for msg in batch:
             timestamp = datetime.fromisoformat(msg['timestamp'].rstrip('Z')).strftime('%Y-%m-%d %H:%M:%S')
-            content += f"""
-            Date: {timestamp}
-            Content: {msg['embeds']}
-            """
-        
-        try:
-            response = client.messages.create(
-                model="claude-3-haiku-20240307",
-                max_tokens=1024,
-                system=system_prompt,
-                messages=[{"role": "user", "content": content}]
-            )
-            all_summaries.append(response.content[0].text)
-            
-            if batch_num < len(message_batches):
-                time.sleep(2)
-                
-        except Exception as e:
-            print(Fore.RED + f"Error processing batch {batch_num}: {e}" + Style.RESET_ALL)
-            raise e
+            batch_content += f"Date: {timestamp}\nContent: {msg['embeds']}\n"
+        all_content.append(batch_content)
     
-    combined_summary = "\n\n".join(all_summaries)
-    
-    final_system_prompt = """You are a news editor creating a final, coherent report from multiple summaries.
-Format your response in these sections:    
-    - Event details
-    - Context and key players
-    - Significance
-
-Organize events chronologically and remove any duplicates. For events without exact times, estimate and mark with '~'."""
-
+    # Single API call with all content
     try:
-        final_response = client.messages.create(
+        response = client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=1024,
-            system=final_system_prompt,
+            system=system_prompt,
             messages=[{
-                "role": "user", 
-                "content": f"Create a unified report from these summaries:\n\n{combined_summary}"
+                "role": "user",
+                "content": f"Analyze and summarize these messages:\n\n{'-' * 40}\n".join(all_content)
             }]
         )
-        return final_response.content[0].text
+        return response.content[0].text
+        
     except Exception as e:
-        print(Fore.RED + f"Error in final summary: {e}" + Style.RESET_ALL)
-        return combined_summary
+        print(Fore.RED + f"Error processing messages: {e}" + Style.RESET_ALL)
+        raise e
 
 def save_output(channel_name, messages, summary):
     os.makedirs('summaries', exist_ok=True)
@@ -233,43 +209,11 @@ def save_output(channel_name, messages, summary):
     start_time = datetime.fromisoformat(messages[-1]['timestamp'].rstrip('Z')).strftime('%Y-%m-%d_%H-%M-%S')
     end_time = datetime.fromisoformat(messages[0]['timestamp'].rstrip('Z')).strftime('%Y-%m-%d_%H-%M-%S')
     
-    summary_system_prompt = """You are a news editor creating executive summaries.
-Format your response in these sections:
-
-[KEY DEVELOPMENTS] 
-- List major events with timestamps [~HH:MM UTC, YYYY-MM-DD]
-- Order chronologically
-
-[MAJOR IMPLICATIONS]
-- Key consequences and significance of these developments
-
-[ASSESSMENT]
-- Brief analysis of the situation and potential outcomes"""
-
-    try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        response = client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=1024,
-            system=summary_system_prompt,
-            messages=[{
-                "role": "user", 
-                "content": f"Create an executive summary of these events from {channel_name}:\n\n{summary}"
-            }]
-        )
-        final_summary = response.content[0].text
-        
-        summary_filename = f"summaries/summary_{channel_name}_{start_time}_to_{end_time}.txt"
-        with open(summary_filename, 'w', encoding='utf-8') as f:
-            f.write(f"CHANNEL: {channel_name}\n")
-            f.write(f"PERIOD: {start_time} to {end_time}\n")
-            f.write("=" * 80 + "\n\n")
-            f.write(final_summary)
-        
-        print(Fore.GREEN + f"Summary saved to {summary_filename}" + Style.RESET_ALL)
-        
-    except Exception as e:
-        print(Fore.RED + f"Error generating summary: {e}" + Style.RESET_ALL)
+    summary_filename = f"summaries/summary_{channel_name}_{start_time}_to_{end_time}.txt"
+    with open(summary_filename, 'w', encoding='utf-8') as f:
+        f.write(summary)
+    
+    print(Fore.GREEN + f"Summary saved to {summary_filename}" + Style.RESET_ALL)
 
 def main():
     if len(sys.argv) != 2:
