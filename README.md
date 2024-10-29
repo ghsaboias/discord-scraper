@@ -5,8 +5,8 @@ This project retrieves messages from specific Discord channels and generates sum
 ## Setup
 
 1. Clone the repository:   ```
-   git clone https://github.com/yourusername/discord-channel-summarizer.git
-   cd discord-channel-summarizer   ```
+   git clone https://github.com/ghsaboias/discord-summarizer.git
+   cd discord-summarizer   ```
 
 2. Install dependencies:   ```
    pip install -r requirements.txt   ```
