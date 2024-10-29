@@ -48,7 +48,7 @@ cd discord-summarizer  `
 Run the script with the desired channel name as an argument:
 
 ```
-python scrape_single_server.py <channel_name>;
+python scrape_single_server.py <channel_name>
 ```
 
 Replace `<channel_name>` with the name of the Discord channel you want to scrape.
