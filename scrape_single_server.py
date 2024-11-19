@@ -216,17 +216,44 @@ def save_output(channel_name, messages, summary):
     print(Fore.GREEN + f"Summary saved to {summary_filename}" + Style.RESET_ALL)
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python scrape_single_server.py <channel_name>")
-        sys.exit(1)
-    
-    search_term = sys.argv[1]
-    
     channels = get_guild_channels(GUILD_ID)
     if not channels:
         print(Fore.RED + "Failed to retrieve channels" + Style.RESET_ALL)
         return
-    
+
+    # Handle channel selection
+    if len(sys.argv) == 2:
+        search_term = sys.argv[1]
+    else:
+        allowed_emojis = {'🟡', '🔴', '🟠', '⚫'}
+        filtered_channels = [
+            channel for channel in channels 
+            if channel['type'] == 0 and  # 0 is the type for text channels
+            len(emoji.emoji_list(channel['name'])) == 1 and # Only one emoji at the start
+            channel['name'][0] in allowed_emojis and
+            ('godly-chat' not in channel['name'] and channel.get('position', 0) < 40)
+        ]
+
+        if not filtered_channels:
+            print(Fore.RED + "No channels available for selection" + Style.RESET_ALL)
+            return
+
+        print(Fore.YELLOW + "Please select a channel from the list below:" + Style.RESET_ALL)
+        for idx, channel in enumerate(filtered_channels, start=1):
+            print(f"{idx}. {channel['name']}")
+
+        try:
+            choice = int(input("Enter the number of the channel you want to select: "))
+            if choice < 1 or choice > len(filtered_channels):
+                print(Fore.RED + "Invalid selection" + Style.RESET_ALL)
+                return
+            channel = filtered_channels[choice - 1]
+        except ValueError:
+            print(Fore.RED + "Invalid input" + Style.RESET_ALL)
+            return
+
+        search_term = channel['name']
+
     channel = find_matching_channel(channels, search_term)
     if not channel:
         print(Fore.RED + f"No channel found matching '{search_term}'" + Style.RESET_ALL)
