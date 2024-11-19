@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from colorama import Fore, Style
 from datetime import datetime, timedelta, timezone
 import emoji
+import shutil
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -89,7 +90,7 @@ def get_bot_messages(channel_id, bot_id="7032"):
             for msg in batch:
                 username = msg['author'].get('username')
                 discriminator = msg['author'].get('discriminator')
-                msg_time = datetime.fromisoformat(msg['timestamp'].rstrip('Z')).replace(tzinfo=timezone.utc)
+                msg_time = convert_to_local(msg['timestamp'], fmt=None)
                 if username == 'FaytuksBot' and discriminator == bot_id and msg_time >= cutoff_time:
                     bot_messages.append(msg)
                     print(Fore.CYAN + f"Found message from {msg_time} by {msg['author'].get('username')}#{msg['author'].get('discriminator', 'N/A')}" + Style.RESET_ALL)
@@ -181,20 +182,27 @@ def format_message_to_html(msg):
                     html += '</div>'
                 html += '</div>'
     
-    # Add attachments if they exist
+    # Update the attachments section
     if msg.get('attachments'):
-        html += '<div class="attachments">'
+        html += '<div class="attachments-grid">'  # Changed class name
         for attachment in msg['attachments']:
             content_type = attachment.get('content_type', '')
             if content_type.startswith('image/'):
-                html += f'<img src="{attachment["url"]}" alt="{attachment["filename"]}" class="attachment-img">'
+                html += f'''
+                    <div class="attachment-item">
+                        <img src="{attachment["url"]}" 
+                             alt="{attachment["filename"]}" 
+                             class="attachment-img"
+                             loading="lazy">
+                    </div>'''
             elif content_type.startswith('video/'):
                 html += f'''
-                    <video controls class="attachment-video">
-                        <source src="{attachment["url"]}" type="{content_type}">
-                        Your browser does not support the video tag.
-                    </video>
-                '''
+                    <div class="attachment-item">
+                        <video controls class="attachment-video">
+                            <source src="{attachment["url"]}" type="{content_type}">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>'''
         html += '</div>'
     
     html += '</div>'
@@ -202,44 +210,11 @@ def format_message_to_html(msg):
 
 def create_html_report(channel_name, messages):
     """Create an HTML report from the messages"""
-    html_template = '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Discord Channel Report - {channel}</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }}
-            .message {{ border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }}
-            .timestamp {{ color: #666; font-size: 0.9em; }}
-            .source {{ color: #666; font-size: 0.9em; margin: 5px 0; }}
-            .source a {{ color: #0066cc; text-decoration: none; }}
-            .source a:hover {{ text-decoration: underline; }}
-            .content {{ margin: 10px 0; }}
-            .embed {{ background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }}
-            .embed-description {{ margin: 10px 0; }}
-            .embed-fields {{ margin: 10px 0; }}
-            .field {{ margin: 5px 0; }}
-            .field-name {{ font-weight: bold; }}
-            .attachments {{ margin: 10px 0; }}
-            .attachment-img {{ max-width: 400px; height: auto; }}
-            .attachment-video {{ max-width: 400px; height: auto; }}
-            h1 {{ color: #333; }}
-            .summary {{ background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-        </style>
-    </head>
-    <body>
-        <h1>Discord Channel Report - {channel}</h1>
-        <div class="summary">
-            <p>Report generated: {timestamp}</p>
-            <p>Total messages: {message_count}</p>
-            <p>Time range: {time_range}</p>
-        </div>
-        <div class="messages">
-            {messages}
-        </div>
-    </body>
-    </html>
-    '''
+    # Read template files
+    template_dir = os.path.join(os.path.dirname(__file__), 'assets')
+    
+    with open(os.path.join(template_dir, 'report_template.html'), 'r', encoding='utf-8') as f:
+        html_template = f.read()
     
     messages_html = '\n'.join(format_message_to_html(msg) for msg in reversed(messages))
     
@@ -258,9 +233,10 @@ def create_html_report(channel_name, messages):
     return html_content
 
 def save_output(channel_name, messages, html_content):
+    """Save the report"""
     os.makedirs('summaries', exist_ok=True)
     
-    # Use filename-safe format for timestamps
+    # Save the report
     start_time = convert_to_local(messages[-1]['timestamp'], '%Y-%m-%d_%H-%M-%S')
     end_time = convert_to_local(messages[0]['timestamp'], '%Y-%m-%d_%H-%M-%S')
     
@@ -269,6 +245,14 @@ def save_output(channel_name, messages, html_content):
         f.write(html_content)
     
     print(Fore.GREEN + f"Report saved to {filename}" + Style.RESET_ALL)
+
+def files_are_identical(path1, path2):
+    """Compare two files to see if they are identical"""
+    if not os.path.exists(path1) or not os.path.exists(path2):
+        return False
+        
+    with open(path1, 'rb') as f1, open(path2, 'rb') as f2:
+        return f1.read() == f2.read()
 
 def main():
     channels = get_guild_channels(GUILD_ID)
