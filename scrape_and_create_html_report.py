@@ -48,7 +48,7 @@ def get_guild_channels(guild_id):
         print(Fore.RED + f"Error retrieving channels: {e}" + Style.RESET_ALL)
         return None
 
-def get_bot_messages(channel_id, bot_id="7032"):
+def get_bot_messages(channel_id, bot_id="7032", hours=24):
     headers = {
         'Authorization': DISCORD_TOKEN
     }
@@ -56,8 +56,8 @@ def get_bot_messages(channel_id, bot_id="7032"):
     try:
         print(Fore.YELLOW + "Retrieving messages from channel..." + Style.RESET_ALL)
         
-        # Get 24 hours ago instead of midnight
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=1)
+        # Get messages from specified hours ago
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         print(Fore.CYAN + f"Looking for messages after: {cutoff_time} UTC" + Style.RESET_ALL)
         
         bot_messages = []
@@ -109,15 +109,14 @@ def get_bot_messages(channel_id, bot_id="7032"):
                 print(Fore.YELLOW + "Reached cutoff time, stopping..." + Style.RESET_ALL)
                 break
                 
-            print(Fore.CYAN + f"Retrieved batch of {len(bot_messages)} messages from last 24h. Total so far: {len(bot_messages)}" + Style.RESET_ALL)
+            print(Fore.CYAN + f"Retrieved batch of {len(bot_messages)} messages from last {hours}h. Total so far: {len(bot_messages)}" + Style.RESET_ALL)
             
             last_message_id = batch[-1]['id']
         
-        print(Fore.GREEN + f"Total messages from today: {len(bot_messages)}" + Style.RESET_ALL)
-        print(Fore.GREEN + f"Bot messages from today: {len(bot_messages)}" + Style.RESET_ALL)
+        print(Fore.GREEN + f"Total messages from last {hours}h: {len(bot_messages)}" + Style.RESET_ALL)
         
         if not bot_messages:
-            print(Fore.YELLOW + "No bot messages found from today" + Style.RESET_ALL)
+            print(Fore.YELLOW + f"No bot messages found from last {hours}h" + Style.RESET_ALL)
         
         return bot_messages
 
@@ -260,14 +259,37 @@ def main():
         print(Fore.RED + "Failed to retrieve channels" + Style.RESET_ALL)
         return
 
+    # Time range selection
+    time_options = {
+        1: ("Last hour", 1),
+        2: ("Last 4 hours", 4),
+        3: ("Last 8 hours", 8),
+        4: ("Last 24 hours", 24)
+    }
+    
+    print(Fore.YELLOW + "\nSelect time range:" + Style.RESET_ALL)
+    for idx, (label, _) in time_options.items():
+        print(f"{idx}. {label}")
+    
+    try:
+        time_choice = int(input("Enter your choice (1-4): "))
+        if time_choice not in time_options:
+            print(Fore.RED + "Invalid time selection" + Style.RESET_ALL)
+            return
+        hours = time_options[time_choice][1]
+    except ValueError:
+        print(Fore.RED + "Invalid input" + Style.RESET_ALL)
+        return
+
+    # Channel selection (existing code)
     if len(sys.argv) == 2:
         search_term = sys.argv[1]
     else:
         allowed_emojis = {'🟡', '🔴', '🟠', '⚫'}
         filtered_channels = [
             channel for channel in channels 
-            if channel['type'] == 0 and  # 0 is the type for text channels
-            len(emoji.emoji_list(channel['name'])) == 1 and # Only one emoji at the start
+            if channel['type'] == 0 and  
+            len(emoji.emoji_list(channel['name'])) == 1 and 
             channel['name'][0] in allowed_emojis and
             ('godly-chat' not in channel['name'] and channel.get('position', 0) < 40)
         ]
@@ -276,7 +298,7 @@ def main():
             print(Fore.RED + "No channels available for selection" + Style.RESET_ALL)
             return
 
-        print(Fore.YELLOW + "Please select a channel from the list below:" + Style.RESET_ALL)
+        print(Fore.YELLOW + "\nPlease select a channel from the list below:" + Style.RESET_ALL)
         for idx, channel in enumerate(filtered_channels, start=1):
             print(f"{idx}. {channel['name']}")
 
@@ -302,7 +324,7 @@ def main():
     
     print(Fore.GREEN + f"Found channel: {channel['name']}" + Style.RESET_ALL)
     
-    messages = get_bot_messages(channel['id'])
+    messages = get_bot_messages(channel['id'], hours=hours)
     if not messages:
         print(Fore.RED + "No messages found in channel" + Style.RESET_ALL)
         return
