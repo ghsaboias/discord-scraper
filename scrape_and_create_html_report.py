@@ -133,7 +133,9 @@ def convert_to_local(utc_timestamp, fmt='%Y-%m-%d %H:%M:%S'):
 def format_message_to_html(msg):
     """Convert a Discord message to HTML format"""
     timestamp = convert_to_local(msg['timestamp'])
-    html = f'<div class="message"><div class="timestamp">{timestamp} (GMT-3)</div>'
+    
+    # Start message div and prepare source/timestamp line
+    html = '<div class="message">'
     
     # Extract source from fields if it exists
     source = None
@@ -144,10 +146,13 @@ def format_message_to_html(msg):
                     if field.get('name', '').lower() == 'source':
                         source = field.get('value', '')
                         break
-                if source:
-                    break
     
-    # Add source below timestamp if found, making it clickable if it's a URL
+    # If no source found in embeds, use message content  
+    if not source and msg.get('content'):
+        source = msg['content'].lower()
+    
+    # Add source and timestamp in the same line
+    html += '<div class="header">'
     if source:
         source_text = source
         if 'http' in source.lower():
@@ -159,12 +164,12 @@ def format_message_to_html(msg):
                     url_end = min(url_end, pos)
             url = source[url_start:url_end]
             source_text = f'<a href="{url}" target="_blank">{url}</a>'
-        html += f'<div class="source">Source: {source_text}</div>'
+        html += f'<span class="source">Source: {source_text}</span>'
+    html += f'<span class="timestamp">{timestamp} (GMT-3)</span></div>'
     
-    # Add embeds if they exist and have content
+    # Rest of the message formatting remains the same...
     if msg.get('embeds'):
         for embed in msg['embeds']:
-            # Only create embed div if there's meaningful content
             if embed.get('description') or any(
                 field.get('name', '').lower() != 'source' and field.get('value')
                 for field in embed.get('fields', [])
@@ -181,9 +186,8 @@ def format_message_to_html(msg):
                     html += '</div>'
                 html += '</div>'
     
-    # Update the attachments section
     if msg.get('attachments'):
-        html += '<div class="attachments-grid">'  # Changed class name
+        html += '<div class="attachments-grid">'
         for attachment in msg['attachments']:
             content_type = attachment.get('content_type', '')
             if content_type.startswith('image/'):

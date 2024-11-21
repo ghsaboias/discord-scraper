@@ -143,4 +143,33 @@ h1 { color: #333; }
 
 .radio-label input {
     cursor: pointer;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+}
+
+.source {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.source a {
+    color: #0066cc;
+    text-decoration: none;
+}
+
+.source a:hover {
+    text-decoration: underline;
+}
+
+.timestamp {
+    white-space: nowrap;
 } 
