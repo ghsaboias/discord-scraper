@@ -5,3 +5,5 @@ channels.txt
 __pycache__/
 *.pyc
 summaries/
+data/
+.DS_Store
