@@ -130,62 +130,144 @@ def convert_to_local(utc_timestamp, fmt='%Y-%m-%d %H:%M:%S'):
     local_time = utc_time.astimezone(timezone(timedelta(hours=-3)))
     return local_time.strftime(fmt) if fmt else local_time
 
+def get_platform_info(url):
+    """Return platform name and icon HTML for a given URL"""
+    if not url:
+        return None, ''
+        
+    platform_icons = {
+        't.me': {
+            'name': 'Telegram',
+            'icon': '../assets/telegram.png'
+        },
+        'twitter.com': {
+            'name': 'X',
+            'icon': '../assets/x.png'
+        },
+        'x.com': {
+            'name': 'X',
+            'icon': '../assets/x.png'
+        }
+    }
+    
+    for domain, info in platform_icons.items():
+        if domain in url.lower():
+            return info['name'], f'<img class="platform-icon {info["name"].lower()}" src="{info["icon"]}" alt="{info["name"]} icon">'
+            
+    return None, ''
+
+def extract_username_from_url(url):
+    """Extract username from Telegram or X/Twitter URL"""
+    if 't.me/' in url:
+        return url.split('t.me/')[1].split('/')[0]
+    elif 'twitter.com/' in url or 'x.com/' in url:
+        parts = url.split('/')
+        # Find the first part after domain that isn't 'status' and isn't empty
+        username = None
+        for part in parts:
+            if part and part not in ['twitter.com', 'x.com', 'status', 'https:', '']:
+                username = part
+                break
+        return username
+    return None
+
 def format_message_to_html(msg):
-    """Convert a Discord message to HTML format"""
+    """Convert a Discord message to HTML format with improved layout"""
     timestamp = convert_to_local(msg['timestamp'])
     
-    # Start message div and prepare source/timestamp line
+    # Start message div
     html = '<div class="message">'
     
-    # Extract source from fields if it exists
+    # Extract source and thumbnail from embeds
     source = None
+    thumbnail_url = None
+    author_icon = None
     if msg.get('embeds'):
         for embed in msg['embeds']:
+            if embed.get('thumbnail'):
+                thumbnail_url = (
+                    embed['thumbnail'].get('proxy_url') or 
+                    embed['thumbnail'].get('url')
+                )
+            
+            if embed.get('author') and embed['author'].get('icon_url'):
+                author_icon = (
+                    embed['author'].get('proxy_icon_url') or 
+                    embed['author'].get('icon_url')
+                )
+            
             if embed.get('fields'):
                 for field in embed['fields']:
                     if field.get('name', '').lower() == 'source':
                         source = field.get('value', '')
                         break
     
-    # If no source found in embeds, use message content  
     if not source and msg.get('content'):
-        source = msg['content'].lower()
-    
-    # Add source and timestamp in the same line
+        source = msg['content']
+
+    # Header section
     html += '<div class="header">'
-    if source:
-        source_text = source
-        if 'http' in source.lower():
-            url_start = source.find('http')
-            url_end = len(source)
-            for char in [' ', '\n', ')']:
-                pos = source.find(char, url_start)
-                if pos != -1:
-                    url_end = min(url_end, pos)
-            url = source[url_start:url_end]
-            source_text = f'<a href="{url}" target="_blank">{url}</a>'
-        html += f'<span class="source">Source: {source_text}</span>'
-    html += f'<span class="timestamp">{timestamp} (GMT-3)</span></div>'
     
-    # Rest of the message formatting remains the same...
+    if source and 'http' in source.lower():
+        url_start = source.find('http')
+        url_end = len(source)
+        for char in [' ', '\n', ')']:
+            pos = source.find(char, url_start)
+            if pos != -1:
+                url_end = min(url_end, pos)
+        url = source[url_start:url_end]
+        username = extract_username_from_url(url)
+        platform_name, platform_icon = get_platform_info(url)
+        
+        # Source profile section
+        html += '<div class="source-profile">'
+        
+        # Profile picture with platform icon overlay
+        html += '<div class="profile-picture-container">'
+        if 'twitter.com' in url.lower() or 'x.com' in url.lower():
+            if author_icon:
+                html += f'<img class="profile-picture" src="{author_icon}" alt="Profile" loading="lazy" onerror="this.style.display=\'none\'">'
+        elif thumbnail_url:
+            html += f'<img class="profile-picture" src="{thumbnail_url}" alt="Profile" loading="lazy" onerror="this.style.display=\'none\'">'
+        if platform_icon:
+            html += f'<div class="platform-icon-overlay">{platform_icon}</div>'
+        html += '</div>'
+        
+        # Username and handle
+        if username:
+            html += f'<div class="profile-info">'
+            html += f'<span class="username">@{username}</span></div>'
+        
+        html += '</div>'  # Close source-profile
+        
+        # Link and timestamp
+        html += '<div class="message-meta">'
+        html += f'<a href="{url}" target="_blank" class="source-link">{url}</a>'
+        html += f'<div class="timestamp">{timestamp} (GMT-3)</div>'
+        html += '</div>'
+    
+    html += '</div>'  # Close header
+
+    # Message content section
     if msg.get('embeds'):
+        html += '<div class="content">'
         for embed in msg['embeds']:
-            if embed.get('description') or any(
-                field.get('name', '').lower() != 'source' and field.get('value')
-                for field in embed.get('fields', [])
-            ):
-                html += '<div class="embed">'
-                if embed.get('description'):
-                    html += f'<div class="embed-description">{embed["description"]}</div>'
-                if embed.get('fields'):
-                    html += '<div class="embed-fields">'
-                    for field in embed['fields']:
-                        if field.get('name', '').lower() != 'source' and field.get('value'):
-                            html += f'<div class="field"><div class="field-name">{field.get("name", "")}</div>'
-                            html += f'<div class="field-value">{field.get("value", "")}</div></div>'
-                    html += '</div>'
+            if embed.get('title'):
+                html += f'<div class="embed-title">{embed["title"]}</div>'
+            
+            if embed.get('description'):
+                html += f'<div class="embed-description">{embed["description"]}</div>'
+            
+            if embed.get('fields'):
+                html += '<div class="embed-fields">'
+                for field in embed['fields']:
+                    if field.get('name', '').lower() != 'source' and field.get('value'):
+                        html += f'<div class="field"><div class="field-name">{field.get("name", "")}</div>'
+                        html += f'<div class="field-value">{field.get("value", "")}</div></div>'
                 html += '</div>'
-    
+        html += '</div>'  # Close content div
+
+    # Attachments section
     if msg.get('attachments'):
         html += '<div class="attachments-grid">'
         for attachment in msg['attachments']:
@@ -208,7 +290,7 @@ def format_message_to_html(msg):
                     </div>'''
         html += '</div>'
     
-    html += '</div>'
+    html += '</div>'  # Close message div
     return html
 
 def create_html_report(channel_name, messages):

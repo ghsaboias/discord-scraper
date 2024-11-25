@@ -5,11 +5,12 @@ body {
     padding: 20px; 
 }
 
-.message { 
-    border: 1px solid #ddd; 
-    margin: 10px 0; 
-    padding: 15px; 
-    border-radius: 5px; 
+.message {
+    background: #ffffff;
+    border-radius: 8px;
+    margin: 15px 0;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .timestamp { 
@@ -148,28 +149,160 @@ h1 { color: #333; }
 .header {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    gap: 15px;
+}
+
+.source-profile {
+    display: flex;
     align-items: center;
-    gap: 20px;
-    color: #666;
-    font-size: 0.9em;
-    margin-bottom: 10px;
+    gap: 12px;
 }
 
-.source {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.profile-picture-container {
+    position: relative;
+    width: 64px;
+    height: 64px;
 }
 
-.source a {
+.profile-picture {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.platform-icon-overlay {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    border-radius: 50%;
+}
+
+.platform-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.platform-icon.x {
+    border-radius: 50%;
+    background-color: white;
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.username {
+    font-size: 1.1em;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+.message-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.source-link {
     color: #0066cc;
     text-decoration: none;
+    font-size: 0.9em;
 }
 
-.source a:hover {
+.source-link:hover {
     text-decoration: underline;
 }
 
 .timestamp {
-    white-space: nowrap;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.content {
+    margin: 15px 0;
+}
+
+.embed-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #1a1a1a;
+}
+
+.embed-description {
+    font-size: 1em;
+    line-height: 1.5;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.embed-fields {
+    margin-top: 10px;
+}
+
+.field {
+    margin-bottom: 10px;
+}
+
+.field-name {
+    font-weight: 500;
+    margin-bottom: 5px;
+    color: #1a1a1a;
+}
+
+.field-value {
+    color: #333;
+}
+
+.attachments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.attachment-item {
+    width: 100%;
+}
+
+.attachment-img, .attachment-video {
+    width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.platform-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+.platform-icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* .platform-icon.x,  {
+    background-color: #000; 
+    border-radius: 4px;
+    padding: 2px;     
+} */
+
+.source {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 } 
