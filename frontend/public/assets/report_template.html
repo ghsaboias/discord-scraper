@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Discord Channel Report - {channel}</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+    <script src="../assets/report.js"></script>
+</head>
+<body>
+    <h1>Discord Channel Report - {channel}</h1>
+    <div class="summary">
+        <p>Report generated: {timestamp}</p>
+        <p>Total messages: {message_count}</p>
+        <p>Time range: {time_range}</p>
+    </div>
+    <div class="controls">
+        <div class="radio-group">
+            <label class="radio-label">
+                <input type="radio" name="sort" value="newest" checked onchange="sortMessages('newest')">
+                Newest first
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="sort" value="oldest" onchange="sortMessages('oldest')">
+                Oldest first
+            </label>
+        </div>
+    </div>
+    <div class="messages">
+        {messages}
+    </div>
+</body>
+</html> 
