@@ -74,11 +74,14 @@ const getEmojiColor = (name: string): number => {
 export default function Home() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannel, setSelectedChannel] = useState<string>('')
-  const [timeWindow, setTimeWindow] = useState<number>(24)
   const [loading, setLoading] = useState<boolean>(false)
-  const [messages, setMessages] = useState<any[]>([])
+  const [allMessages, setAllMessages] = useState<any[]>([])
+  const [displayedMessages, setDisplayedMessages] = useState<any[]>([])
+  const [displayLimit] = useState(100)
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null)
   const [selectedVideo, setSelectedVideo] = useState<{ src: string; type: string } | null>(null)
+  const [summary, setSummary] = useState('')
+  const [summarizing, setSummarizing] = useState(false)
 
   useEffect(() => {
     fetchChannels()
@@ -98,44 +101,78 @@ export default function Home() {
     if (!selectedChannel) return;
     
     setLoading(true);
-    setMessages([]);
+    setAllMessages([]);
+    setDisplayedMessages([]);
     
     try {
-        console.log(`Starting scrape for channel ${selectedChannel}, ${timeWindow} hours`);
+        const eventSource = new EventSource(`http://localhost:8000/api/scrape/${selectedChannel}`);
         
-        const response = await fetch('http://localhost:8000/api/scrape', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                channel_id: selectedChannel,
-                hours: timeWindow,
-            }),
+        eventSource.onmessage = (event) => {
+            const newMessages = JSON.parse(event.data);
+            setAllMessages(prevMessages => {
+                const updatedMessages = [...prevMessages, ...newMessages].sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                );
+                setDisplayedMessages(updatedMessages.slice(0, displayLimit));
+                return updatedMessages;
+            });
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('EventSource error:', error);
+            eventSource.close();
+            setLoading(false);
+        };
+        
+        eventSource.addEventListener('complete', () => {
+            eventSource.close();
+            setLoading(false);
         });
-        
-        console.log(`Received response with status: ${response.status}`);
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log(`Received ${data.length} messages`);
-        setMessages(data);
-        
-        if (data.length === 0) {
-            alert('No messages found in the selected time range');
-        }
         
     } catch (error) {
         console.error('Error scraping messages:', error);
         alert(`Error scraping messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
         setLoading(false);
     }
   }
+
+  const handleLoadMore = () => {
+    const currentLength = displayedMessages.length;
+    const newMessages = allMessages.slice(currentLength, currentLength + displayLimit);
+    setDisplayedMessages(prev => [...prev, ...newMessages]);
+  }
+
+  const handleSummarize = async () => {
+    if (!displayedMessages.length) return;
+    
+    setSummarizing(true);
+    
+    try {
+        const response = await fetch('http://localhost:8000/api/summarize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(displayedMessages),
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to generate summary');
+        }
+        
+        const data = await response.json();
+        setSummary(data.summary);
+    } catch (error) {
+        console.error('Error generating summary:', error);
+        alert('Failed to generate summary');
+    } finally {
+        setSummarizing(false);
+    }
+  }
+
+  const handleCopySummary = () => {
+    navigator.clipboard.writeText(summary);
+  };
 
   const renderMessage = (msg: any) => {
     const timestamp = new Date(msg.timestamp).toLocaleString()
@@ -248,12 +285,12 @@ export default function Home() {
                   const isVideo = attachment.content_type?.startsWith('video/')
 
                   return (
-                    <div key={index} className="relative group">
+                    <div key={index} className="relative group aspect-video">
                       {isImage && (
                         <img
                           src={attachment.url}
                           alt={attachment.filename}
-                          className="rounded-lg w-full h-auto cursor-pointer transition-all duration-200 group-hover:ring-2 group-hover:ring-blue-500/50"
+                          className="rounded-lg w-full h-full object-cover cursor-pointer transition-all duration-200 group-hover:ring-2 group-hover:ring-blue-500/50"
                           loading="lazy"
                           onClick={() => setSelectedImage({
                             src: attachment.url,
@@ -263,14 +300,14 @@ export default function Home() {
                       )}
                       {isVideo && (
                         <div 
-                          className="cursor-pointer group relative"
+                          className="cursor-pointer group relative h-full"
                           onClick={() => setSelectedVideo({
                             src: attachment.url,
                             type: attachment.content_type
                           })}
                         >
                           <video
-                            className="rounded-lg w-full h-auto ring-1 ring-gray-700 group-hover:ring-2 group-hover:ring-blue-500/50 transition-all duration-200"
+                            className="rounded-lg w-full h-full object-cover ring-1 ring-gray-700 group-hover:ring-2 group-hover:ring-blue-500/50 transition-all duration-200"
                           >
                             <source
                               src={attachment.url}
@@ -310,41 +347,28 @@ export default function Home() {
         </h1>
         
         <div className="space-y-4 mb-8">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <select
-              value={selectedChannel}
-              onChange={(e) => setSelectedChannel(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none"
-            >
-              <option value="">Select a feed</option>
-              {channels
-                .sort((a, b) => {
-                  const colorA = getEmojiColor(a.name);
-                  const colorB = getEmojiColor(b.name);
-                  if (colorA === colorB) {
-                    return a.name.localeCompare(b.name);
-                  }
-                  return colorA - colorB;
-                })
-                .map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channel.name}
-                  </option>
-                ))}
-            </select>
-
-            <select
-              value={timeWindow}
-              onChange={(e) => setTimeWindow(Number(e.target.value))}
-              className="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none"
-            >
-              <option value={1}>Last hour</option>
-              <option value={4}>Last 4 hours</option>
-              <option value={8}>Last 8 hours</option>
-              <option value={24}>Last 24 hours</option>
-            </select>
-          </div>
-
+          <select
+            value={selectedChannel}
+            onChange={(e) => setSelectedChannel(e.target.value)}
+            className="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none"
+          >
+            <option value="">Select a feed</option>
+            {channels
+              .sort((a, b) => {
+                const colorA = getEmojiColor(a.name);
+                const colorB = getEmojiColor(b.name);
+                if (colorA === colorB) {
+                  return a.name.localeCompare(b.name);
+                }
+                return colorA - colorB;
+              })
+              .map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.name}
+                </option>
+              ))}
+          </select>
+          
           <button
             onClick={handleScrape}
             disabled={!selectedChannel || loading}
@@ -352,19 +376,66 @@ export default function Home() {
           >
             {loading ? 'Loading...' : 'Load News'}
           </button>
+          {displayedMessages.length > 0 && (
+            <button
+              onClick={handleSummarize}
+              disabled={loading || summarizing}
+              className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors mt-2"
+            >
+              Summarize with AI ✨
+            </button>
+          )}
         </div>
 
-        {messages.length > 0 && (
+        {summarizing && (
+          <div className="mb-8 p-6 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              <span className="ml-3">Generating summary...</span>
+            </div>
+          </div>
+        )}
+
+        {summary && !summarizing && (
+          <div className="mb-8 p-6 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-medium text-gray-200">AI Summary ✨</h3>
+              <button
+                onClick={handleCopySummary}
+                className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                title="Copy summary"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-gray-300 whitespace-pre-wrap">{summary}</p>
+          </div>
+        )}
+
+        {displayedMessages.length > 0 && (
           <div>
             <h2 className="text-xl font-medium text-gray-200 mb-6 flex items-center">
               Updates
               <span className="ml-2 px-2.5 py-0.5 bg-gray-800 text-gray-400 text-sm rounded-full">
-                {messages.length}
+                {allMessages.length}
               </span>
             </h2>
             <div className="space-y-4">
-              {messages.map((msg) => renderMessage(msg))}
+              {displayedMessages.map((msg) => renderMessage(msg))}
             </div>
+            {allMessages.length > displayedMessages.length && (
+              <button
+                onClick={handleLoadMore}
+                className="w-full mt-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+              >
+                Load More Messages
+                <span className="ml-2 text-gray-400">
+                  ({displayedMessages.length} of {allMessages.length})
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>

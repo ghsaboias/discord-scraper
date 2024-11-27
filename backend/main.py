@@ -1,9 +1,15 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
+import json
+import asyncio
+from ai.summarizer import generate_summary
+from datetime import datetime, timedelta, timezone
+import requests
 
 # Change from relative to absolute import
 from scraping.discord_client import (
@@ -68,23 +74,81 @@ async def get_channels():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/scrape")
-async def scrape_channel(request: ScrapeRequest):
-    """Scrape messages from a channel"""
+async def event_generator(channel_id: str, hours: int):
+    """Generate SSE events for message updates"""
     try:
-        print(f"\nReceived scrape request for channel {request.channel_id}, {request.hours} hours")
+        last_message_id = None
+        batch_count = 0
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
-        if not request.channel_id:
-            raise HTTPException(status_code=400, detail="Channel ID is required")
-        
-        messages = get_bot_messages(request.channel_id, hours=request.hours)
-        
-        print(f"Scraping complete, found {len(messages) if messages else 0} messages")
-        
-        return messages or []
+        while True:
+            batch_count += 1
+            print(f"\nFetching batch {batch_count}...")
+            
+            # Get batch of messages
+            batch = get_batch_messages(channel_id, last_message_id)
+            if not batch:
+                break
+                
+            # Process batch and get bot messages
+            bot_messages = []
+            for msg in batch:
+                msg_time = datetime.fromisoformat(msg['timestamp'].rstrip('Z')).replace(tzinfo=timezone.utc)
+                if (msg['author'].get('username') == 'FaytuksBot' and 
+                    msg['author'].get('discriminator') == '7032' and 
+                    msg_time >= cutoff_time):
+                    bot_messages.append(msg)
+            
+            # Send this batch's bot messages immediately
+            if bot_messages:
+                yield f"data: {json.dumps(bot_messages)}\n\n"
+                await asyncio.sleep(0.1)  # Small delay between batches
+            
+            # Check if we should stop
+            last_msg_time = datetime.fromisoformat(batch[-1]['timestamp'].rstrip('Z')).replace(tzinfo=timezone.utc)
+            if last_msg_time < cutoff_time:
+                break
+                
+            last_message_id = batch[-1]['id']
+            
+        # Send completion event
+        yield "event: complete\ndata: null\n\n"
         
     except Exception as e:
-        print(f"Error in scrape_channel endpoint: {str(e)}")
-        import traceback
-        print(traceback.format_exc())
+        print(f"Error in event generator: {str(e)}")
+        yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+def get_batch_messages(channel_id: str, last_message_id: Optional[str] = None):
+    """Helper function to get a batch of messages"""
+    headers = {'Authorization': DISCORD_TOKEN}
+    url = f'https://discord.com/api/v10/channels/{channel_id}/messages?limit=100'
+    if last_message_id:
+        url += f'&before={last_message_id}'
+        
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        return None
+        
+    return json.loads(response.text)
+
+@app.get("/api/scrape/{channel_id}")
+async def scrape_channel(channel_id: str, hours: int = 24):
+    """Scrape messages from a channel with SSE"""
+    return StreamingResponse(
+        event_generator(channel_id, hours),
+        media_type="text/event-stream",
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        }
+    )
+
+@app.post("/api/summarize")
+async def summarize_messages(messages: List[dict]):
+    """Generate an AI summary of the messages"""
+    try:
+        summary = await generate_summary(messages)
+        return {"summary": summary}
+    except Exception as e:
+        print(f"Error in summarize endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
