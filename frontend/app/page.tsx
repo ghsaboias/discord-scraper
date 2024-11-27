@@ -82,6 +82,7 @@ export default function Home() {
   const [selectedVideo, setSelectedVideo] = useState<{ src: string; type: string } | null>(null)
   const [summary, setSummary] = useState('')
   const [summarizing, setSummarizing] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     fetchChannels()
@@ -172,6 +173,8 @@ export default function Home() {
 
   const handleCopySummary = () => {
     navigator.clipboard.writeText(summary);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000); // Hide after 2 seconds
   };
 
   const renderMessage = (msg: any) => {
@@ -402,12 +405,23 @@ export default function Home() {
               <h3 className="text-lg font-medium text-gray-200">AI Summary ✨</h3>
               <button
                 onClick={handleCopySummary}
-                className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                className="group relative p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
                 title="Copy summary"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+                {copySuccess ? (
+                  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
+                
+                {/* Tooltip */}
+                <span className="absolute -top-8 right-0 bg-gray-900 text-gray-200 px-2 py-1 rounded text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                  {copySuccess ? 'Copied!' : 'Copy summary'}
+                </span>
               </button>
             </div>
             <p className="text-gray-300 whitespace-pre-wrap">{summary}</p>
