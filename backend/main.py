@@ -65,9 +65,12 @@ async def get_channels():
         filtered_channels = [
             channel for channel in channels 
             if channel['type'] == 0 and
-            len(channel['name']) > 0 and
-            channel['name'][0] in allowed_emojis and
-            ('godly-chat' not in channel['name'] and channel.get('position', 0) < 40)
+            (
+                len(channel['name']) > 0 and
+                channel['name'][0] in allowed_emojis and
+                ('godly-chat' not in channel['name'] and channel.get('position', 0) < 40)
+                or channel['parent_id'] == '1112044935982633060'
+            ) 
         ]
         
         return filtered_channels
