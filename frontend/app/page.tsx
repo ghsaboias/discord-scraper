@@ -368,11 +368,19 @@ export default function Home() {
     setSummary('');
   };
 
+  const handleDeleteSummary = (summaryToDelete: Summary) => {
+    setSummaryHistory(prev => prev.filter(sum => 
+      sum.timestamp !== summaryToDelete.timestamp || 
+      sum.channelName !== summaryToDelete.channelName
+    ));
+  };
+
   return (
     <main className="min-h-screen bg-gray-900 text-gray-100 flex relative">
       <ResizableSidebar
         summaryHistory={summaryHistory}
         onSelectSummary={setSelectedHistorySummary}
+        onDeleteSummary={handleDeleteSummary}
       />
       
       <div className="flex-1">
@@ -385,7 +393,7 @@ export default function Home() {
             <select
               value={selectedChannel}
               onChange={handleChannelChange}
-              className="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none"
+              className="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-800 text-gray-200 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none cursor-pointer border-r-[0.625rem]"
             >
               <option value="">Select a feed</option>
               {channels
