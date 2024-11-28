@@ -4,3 +4,9 @@ export interface Channel {
     type: number
     position?: number
 }
+
+export interface Summary {
+    text: string;
+    timestamp: string;
+    channelName: string;
+}

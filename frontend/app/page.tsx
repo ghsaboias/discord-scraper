@@ -2,7 +2,7 @@
 
 import ImageModal from '@/components/ImageModal'
 import VideoModal from '@/components/VideoModal'
-import { Channel } from '@/types/discord'
+import { Channel, Summary } from '@/types/discord'
 import { useEffect, useState } from 'react'
 
 // Helper function to extract username from URLs
@@ -83,6 +83,9 @@ export default function Home() {
   const [summary, setSummary] = useState('')
   const [summarizing, setSummarizing] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false);
+  const [summaryHistory, setSummaryHistory] = useState<Summary[]>([])
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [selectedHistorySummary, setSelectedHistorySummary] = useState<Summary | null>(null);
 
   useEffect(() => {
     fetchChannels()
@@ -163,6 +166,15 @@ export default function Home() {
         
         const data = await response.json();
         setSummary(data.summary);
+
+        // Add to history
+        const selectedChannelName = channels.find(c => c.id === selectedChannel)?.name || 'Unknown Channel';
+        const newSummary: Summary = {
+          text: data.summary,
+          timestamp: new Date().toISOString(),
+          channelName: selectedChannelName
+        };
+        setSummaryHistory(prev => [newSummary, ...prev]);
     } catch (error) {
         console.error('Error generating summary:', error);
         alert('Failed to generate summary');
@@ -342,116 +354,183 @@ export default function Home() {
     )
   }
 
+  useEffect(() => {
+    setSummary('');
+  }, [selectedChannel]);
+
+  // Update the channel selection handler
+  const handleChannelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedChannel(e.target.value);
+    // Clear messages and summary when changing channels
+    setAllMessages([]);
+    setDisplayedMessages([]);
+    setSummary('');
+  };
+
   return (
-    <main className="min-h-screen bg-gray-900 text-gray-100">
-      <div className="max-w-5xl mx-auto p-6 sm:p-8">
-        <h1 className="text-3xl font-bold mb-8 text-center bg-clip-text text-gray-200">
-          NewsNow
-        </h1>
-        
-        <div className="space-y-4 mb-8">
-          <select
-            value={selectedChannel}
-            onChange={(e) => setSelectedChannel(e.target.value)}
-            className="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none"
-          >
-            <option value="">Select a feed</option>
-            {channels
-              .sort((a, b) => {
-                const colorA = getEmojiColor(a.name);
-                const colorB = getEmojiColor(b.name);
-                if (colorA === colorB) {
-                  return a.name.localeCompare(b.name);
-                }
-                return colorA - colorB;
-              })
-              .map((channel) => (
-                <option key={channel.id} value={channel.id}>
-                  {channel.name}
-                </option>
-              ))}
-          </select>
-          
-          <button
-            onClick={handleScrape}
-            disabled={!selectedChannel || loading}
-            className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors"
-          >
-            {loading ? 'Loading...' : 'Load News'}
-          </button>
-          {displayedMessages.length > 0 && (
-            <button
-              onClick={handleSummarize}
-              disabled={loading || summarizing}
-              className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors mt-2"
-            >
-              Summarize with AI ✨
-            </button>
-          )}
+    <main className="min-h-screen bg-gray-900 text-gray-100 flex relative">
+      {/* Sidebar Toggle Button */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="absolute top-4 left-4 z-50 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+        title={isSidebarOpen ? "Hide history" : "Show history"}
+      >
+        {isSidebarOpen ? (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
+        ) : (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        )}
+      </button>
+
+      {/* Update the sidebar div with conditional classes */}
+      <div className={`
+        w-80 border-r border-gray-700 h-screen overflow-y-auto sticky top-0 p-4 
+        bg-gray-800/50 backdrop-blur-sm transition-all duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="mt-12"> {/* Add margin-top to account for toggle button */}
+          <h2 className="text-xl font-medium text-gray-200 mb-4">Summary History</h2>
+          <div className="space-y-4">
+            {summaryHistory.map((sum, index) => (
+              <div 
+                key={index} 
+                className="p-4 rounded-lg bg-gray-800 border border-gray-700 cursor-pointer hover:bg-gray-700/50 transition-colors"
+                onClick={() => setSelectedHistorySummary(sum)}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm font-medium text-gray-300">{sum.channelName}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(sum.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-300 line-clamp-3">{sum.text}</p>
+              </div>
+            ))}
+          </div>
         </div>
+      </div>
 
-        {summarizing && (
-          <div className="mb-8 p-6 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-              <span className="ml-3">Generating summary...</span>
-            </div>
-          </div>
-        )}
-
-        {summary && !summarizing && (
-          <div className="mb-8 p-6 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-medium text-gray-200">AI Summary ✨</h3>
+      {/* Update the main content div with conditional padding */}
+      <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'pl-0' : 'pl-0'}`}>
+        <div className="max-w-5xl mx-auto p-6 sm:p-8">
+          <h1 className="text-3xl font-bold mb-8 text-center bg-clip-text text-gray-200">
+            NewsNow
+          </h1>
+          
+          <div className="space-y-4 mb-8">
+            <select
+              value={selectedChannel}
+              onChange={handleChannelChange}
+              className="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none"
+            >
+              <option value="">Select a feed</option>
+              {channels
+                .sort((a, b) => {
+                  const colorA = getEmojiColor(a.name);
+                  const colorB = getEmojiColor(b.name);
+                  if (colorA === colorB) {
+                    return a.name.localeCompare(b.name);
+                  }
+                  return colorA - colorB;
+                })
+                .map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.name}
+                  </option>
+                ))}
+            </select>
+            
+            <button
+              onClick={handleScrape}
+              disabled={!selectedChannel || loading}
+              className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors"
+            >
+              {loading ? 'Loading...' : 'Load News'}
+            </button>
+            {displayedMessages.length > 0 && (
               <button
-                onClick={handleCopySummary}
-                className="group relative p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
-                title="Copy summary"
+                onClick={handleSummarize}
+                disabled={loading || summarizing}
+                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors mt-2"
               >
-                {copySuccess ? (
-                  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                )}
-                
-                {/* Tooltip */}
-                <span className="absolute -top-8 right-0 bg-gray-900 text-gray-200 px-2 py-1 rounded text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                  {copySuccess ? 'Copied!' : 'Copy summary'}
-                </span>
-              </button>
-            </div>
-            <p className="text-gray-300 whitespace-pre-wrap">{summary}</p>
-          </div>
-        )}
-
-        {displayedMessages.length > 0 && (
-          <div>
-            <h2 className="text-xl font-medium text-gray-200 mb-6 flex items-center">
-              Updates
-              <span className="ml-2 px-2.5 py-0.5 bg-gray-800 text-gray-400 text-sm rounded-full">
-                {allMessages.length}
-              </span>
-            </h2>
-            <div className="space-y-4">
-              {displayedMessages.map((msg) => renderMessage(msg))}
-            </div>
-            {allMessages.length > displayedMessages.length && (
-              <button
-                onClick={handleLoadMore}
-                className="w-full mt-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
-              >
-                Load More Messages
-                <span className="ml-2 text-gray-400">
-                  ({displayedMessages.length} of {allMessages.length})
-                </span>
+                Summarize with AI ✨
               </button>
             )}
           </div>
-        )}
+
+          {summarizing && (
+            <div className="mb-8 p-6 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                <span className="ml-3">Generating summary...</span>
+              </div>
+            </div>
+          )}
+
+          {summary && !summarizing && (
+            <div className="mb-8 p-6 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-lg font-medium text-gray-200">AI Summary ✨</h3>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleCopySummary}
+                    className="group relative p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                    title="Copy summary"
+                  >
+                    {copySuccess ? (
+                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setSummary('')}
+                    className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                    title="Close summary"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <p className="text-gray-300 whitespace-pre-wrap">{summary}</p>
+            </div>
+          )}
+
+          {displayedMessages.length > 0 && (
+            <div>
+              <h2 className="text-xl font-medium text-gray-200 mb-6 flex items-center">
+                Updates
+                <span className="ml-2 px-2.5 py-0.5 bg-gray-800 text-gray-400 text-sm rounded-full">
+                  {allMessages.length}
+                </span>
+              </h2>
+              <div className="space-y-4">
+                {displayedMessages.map((msg) => renderMessage(msg))}
+              </div>
+              {allMessages.length > displayedMessages.length && (
+                <button
+                  onClick={handleLoadMore}
+                  className="w-full mt-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+                >
+                  Load More Messages
+                  <span className="ml-2 text-gray-400">
+                    ({displayedMessages.length} of {allMessages.length})
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       
       {selectedImage && (
@@ -468,6 +547,62 @@ export default function Home() {
           type={selectedVideo.type}
           onClose={() => setSelectedVideo(null)}
         />
+      )}
+
+      {selectedHistorySummary && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={(e) => {
+            // Close modal when clicking the backdrop (but not when clicking the modal itself)
+            if (e.target === e.currentTarget) {
+              setSelectedHistorySummary(null);
+            }
+          }}
+        >
+          <div className="bg-gray-800 rounded-xl max-w-2xl w-full mx-4 p-6 shadow-xl">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-200">{selectedHistorySummary.channelName}</h3>
+                <p className="text-sm text-gray-400">
+                  {new Date(selectedHistorySummary.timestamp).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedHistorySummary.text);
+                    setCopySuccess(true);
+                    setTimeout(() => setCopySuccess(false), 2000);
+                  }}
+                  className="flex items-center space-x-2 p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                  title="Copy summary"
+                >
+                  {copySuccess ? (
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => setSelectedHistorySummary(null)}
+                  className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                  title="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 text-gray-300 whitespace-pre-wrap">
+              {selectedHistorySummary.text}
+            </div>
+          </div>
+        </div>
       )}
     </main>
   )
