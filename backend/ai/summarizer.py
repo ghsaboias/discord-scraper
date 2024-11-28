@@ -50,7 +50,7 @@ Please provide a summary in the following strict format:
 [Main Topic/Region] Update - [Current Date]
 
 Overview:
-Write a focused 2-3 sentence overview covering the most significant developments. If there are multiple unrelated but important developments, mention them all briefly.
+Write a focused 5-7 sentence overview covering the most significant developments. If there are multiple unrelated but important developments, mention them all briefly.
 
 Key Developments:
 
@@ -64,10 +64,16 @@ Key Developments:
 - Another significant but unrelated event
 - Additional noteworthy development from different area/topic
 
+[Tertiary Developments]:
+- Additional development from different area/topic
+- Another significant but unrelated event
+- Additional noteworthy development from different area/topic
+
 [Additional Details/Impact]:
 - Clear, factual point with specific information
 - Another detailed development
-- Final key point with concrete details
+- Another detailed development
+- Another detailed development
 
 Guidelines:
 - Primary category should cover the main event/crisis
@@ -86,7 +92,7 @@ Summary:"""
     try:
         response = client.messages.create(
             model="claude-3-5-haiku-20241022",
-            max_tokens=1500,
+            max_tokens=2500,
             temperature=0,
             system="""You are an expert news analyst that creates clear, structured summaries.
 Focus on specific facts and concrete details.
