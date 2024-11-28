@@ -44,25 +44,57 @@ async def generate_summary(messages: List[dict]) -> str:
     """Generate a summary of the messages using Claude"""
     formatted_text = format_messages_for_summary(messages)
     
-    prompt = f"""You are a helpful AI assistant. Below are news updates from various sources. 
-Please provide a clear, concise summary of the key information, organized by topic.
-Focus on the most important developments and maintain a neutral tone. Don't include opinions, speculation or introductory phrases.
+    prompt = f"""You are a news analyst specializing in clear, structured summaries. Below are news updates from various sources. 
+Please provide a summary in the following strict format:
 
-News Updates:
+[Main Topic/Region] Update - [Current Date]
+
+Overview:
+Write a focused 2-3 sentence overview covering the most significant developments. If there are multiple unrelated but important developments, mention them all briefly.
+
+Key Developments:
+
+[Primary Event/Topic]:
+- Detailed point with specific facts (numbers, names, locations)
+- Another specific point with clear impact or significance
+- Additional key detail with concrete information
+
+[Secondary Developments]:
+- Important but separate development with specific details
+- Another significant but unrelated event
+- Additional noteworthy development from different area/topic
+
+[Additional Details/Impact]:
+- Clear, factual point with specific information
+- Another detailed development
+- Final key point with concrete details
+
+Guidelines:
+- Primary category should cover the main event/crisis
+- Secondary Developments category must include other significant events, even if unrelated
+- Each bullet point must contain specific facts (numbers, names, locations)
+- Include both major developments and significant tangential events
+- Maintain clear cause-and-effect relationships
+- Avoid vague language or speculation
+- Keep a neutral, analytical tone
+
+News Updates to Summarize:
 {formatted_text}
-
-Please provide a summary in the following format:
-- A brief 2-3 sentence overview of the main developments
-- Bullet points of key points by topic
 
 Summary:"""
 
     try:
         response = client.messages.create(
             model="claude-3-5-haiku-20241022",
-            max_tokens=1000,
+            max_tokens=1500,
             temperature=0,
-            system="You are a helpful AI assistant that specializes in summarizing news and information clearly and concisely. You return the summary in the format specified above, without any introductory phrases or additional commentary.",
+            system="""You are an expert news analyst that creates clear, structured summaries.
+Focus on specific facts and concrete details.
+Avoid vague language like 'multiple', 'various', or 'several'.
+Use precise numbers, names, and locations whenever possible.
+Include both primary events and significant secondary developments.
+Ensure no important information is omitted, even if it seems tangential.
+Maintain consistent formatting and professional tone.""",
             messages=[
                 {
                     "role": "user",
