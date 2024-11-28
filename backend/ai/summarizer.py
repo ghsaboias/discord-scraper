@@ -2,6 +2,7 @@ import anthropic
 from typing import List
 import os
 from dotenv import load_dotenv
+from datetime import datetime, timezone
 
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -44,7 +45,14 @@ async def generate_summary(messages: List[dict]) -> str:
     """Generate a summary of the messages using Claude"""
     formatted_text = format_messages_for_summary(messages)
     
-    prompt = f"""You are a news analyst specializing in clear, structured summaries. Below are news updates from various sources. 
+    # Calculate the timeframe of the messages
+    timestamps = [datetime.fromisoformat(msg['timestamp'].rstrip('Z')).replace(tzinfo=timezone.utc) 
+                 for msg in messages]
+    oldest = min(timestamps)
+    newest = max(timestamps)
+    hours_diff = round((newest - oldest).total_seconds() / 3600, 1)
+    
+    prompt = f"""You are a news analyst specializing in clear, structured summaries. Below are news updates from the last {hours_diff} hours. 
 Please provide a summary in the following strict format:
 
 [Main Topic/Region] Update - [Current Date]

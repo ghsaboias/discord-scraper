@@ -137,20 +137,41 @@ def get_batch_messages(channel_id: str, last_message_id: Optional[str] = None):
 @app.get("/api/scrape/{channel_id}")
 async def scrape_channel(channel_id: str, hours: int = 24):
     """Scrape messages from a channel with SSE"""
-    return StreamingResponse(
-        event_generator(channel_id, hours),
-        media_type="text/event-stream",
-        headers={
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-        }
-    )
+    try:
+        # Validate hours parameter
+        if hours not in [6, 12, 24, 48, 72]:
+            hours = 24  # Default to 24 if invalid value
+            
+        return StreamingResponse(
+            event_generator(channel_id, hours),
+            media_type="text/event-stream",
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+            }
+        )
+    except Exception as e:
+        print(f"Error in scrape endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/summarize")
-async def summarize_messages(messages: List[dict]):
+async def summarize_messages(request: dict):
     """Generate an AI summary of the messages"""
     try:
-        summary = await generate_summary(messages)
+        messages = request.get("messages", [])
+        hours = request.get("hours", 24)  # Default to 24 hours if not specified
+        
+        # Filter messages based on timeframe
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+        filtered_messages = [
+            msg for msg in messages 
+            if datetime.fromisoformat(msg['timestamp'].rstrip('Z')).replace(tzinfo=timezone.utc) >= cutoff_time
+        ]
+        
+        if not filtered_messages:
+            raise HTTPException(status_code=400, detail="No messages found in the specified timeframe")
+        
+        summary = await generate_summary(filtered_messages)
         return {"summary": summary}
     except Exception as e:
         print(f"Error in summarize endpoint: {str(e)}")

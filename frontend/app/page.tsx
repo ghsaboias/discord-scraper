@@ -87,6 +87,8 @@ export default function Home() {
   const [summaryHistory, setSummaryHistory] = useState<Summary[]>([])
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedHistorySummary, setSelectedHistorySummary] = useState<Summary | null>(null);
+  const [summaryTimeframe, setSummaryTimeframe] = useState<number>(24);
+  const [loadTimeframe, setLoadTimeframe] = useState<number>(24);
 
   useEffect(() => {
     fetchChannels()
@@ -110,34 +112,34 @@ export default function Home() {
     setDisplayedMessages([]);
     
     try {
-      const eventSource = new EventSource(`http://localhost:8000/api/scrape/${selectedChannel}`);
-      
-      eventSource.onmessage = (event) => {
-        const newMessages = JSON.parse(event.data);
-        setAllMessages(prevMessages => {
-          const updatedMessages = [...prevMessages, ...newMessages].sort((a, b) => 
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          );
-          setDisplayedMessages(updatedMessages.slice(0, displayLimit));
-          return updatedMessages;
+        const eventSource = new EventSource(`http://localhost:8000/api/scrape/${selectedChannel}?hours=${loadTimeframe}`);
+        
+        eventSource.onmessage = (event) => {
+            const newMessages = JSON.parse(event.data);
+            setAllMessages(prevMessages => {
+                const updatedMessages = [...prevMessages, ...newMessages].sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                );
+                setDisplayedMessages(updatedMessages.slice(0, displayLimit));
+                return updatedMessages;
+            });
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('EventSource error:', error);
+            eventSource.close();
+            setLoading(false);
+        };
+        
+        eventSource.addEventListener('complete', () => {
+            eventSource.close();
+            setLoading(false);
         });
-      };
-      
-      eventSource.onerror = (error) => {
-        console.error('EventSource error:', error);
-        eventSource.close();
-        setLoading(false);
-      };
-      
-      eventSource.addEventListener('complete', () => {
-        eventSource.close();
-        setLoading(false);
-      });
-      
+        
     } catch (error) {
-      console.error('Error scraping messages:', error);
-      alert(`Error scraping messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setLoading(false);
+        console.error('Error scraping messages:', error);
+        alert(`Error scraping messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setLoading(false);
     }
   }
 
@@ -158,7 +160,10 @@ export default function Home() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(displayedMessages),
+            body: JSON.stringify({
+                messages: displayedMessages,
+                hours: summaryTimeframe
+            }),
         });
         
         if (!response.ok) {
@@ -171,9 +176,9 @@ export default function Home() {
         // Add to history
         const selectedChannelName = channels.find(c => c.id === selectedChannel)?.name || 'Unknown Channel';
         const newSummary: Summary = {
-          text: data.summary,
-          timestamp: new Date().toISOString(),
-          channelName: selectedChannelName
+            text: data.summary,
+            timestamp: new Date().toISOString(),
+            channelName: selectedChannelName
         };
         setSummaryHistory(prev => [newSummary, ...prev]);
     } catch (error) {
@@ -375,6 +380,11 @@ export default function Home() {
     ));
   };
 
+  // Add this effect to update summaryTimeframe when loadTimeframe changes
+  useEffect(() => {
+    setSummaryTimeframe(Math.min(summaryTimeframe, loadTimeframe));
+  }, [loadTimeframe]);
+
   return (
     <main className="min-h-screen bg-gray-900 text-gray-100 flex relative">
       <ResizableSidebar
@@ -412,6 +422,21 @@ export default function Home() {
                 ))}
             </select>
             
+            <div className="flex items-center space-x-4 mb-2">
+              <label className="text-gray-300">Load last:</label>
+              <select
+                value={loadTimeframe}
+                onChange={(e) => setLoadTimeframe(Number(e.target.value))}
+                className="bg-gray-800 border border-gray-800 text-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none border-r-[0.625rem] cursor-pointer"
+              >
+                <option value={6}>6 hours</option>
+                <option value={12}>12 hours</option>
+                <option value={24}>24 hours</option>
+                <option value={48}>48 hours</option>
+                <option value={72}>72 hours</option>
+              </select>
+            </div>
+            
             <button
               onClick={handleScrape}
               disabled={!selectedChannel || loading}
@@ -420,13 +445,30 @@ export default function Home() {
               {loading ? 'Loading...' : 'Load News'}
             </button>
             {displayedMessages.length > 0 && (
-              <button
-                onClick={handleSummarize}
-                disabled={loading || summarizing}
-                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors mt-2"
-              >
-                Summarize with AI ✨
-              </button>
+              <>
+                <div className="flex items-center space-x-4 mb-2">
+                  <label className="text-gray-300">Summarize last:</label>
+                  <select
+                    value={summaryTimeframe}
+                    onChange={(e) => setSummaryTimeframe(Number(e.target.value))}
+                    className="bg-gray-800 border border-gray-800 text-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500/50 focus:border-transparent border-r-[0.625rem] cursor-pointer"
+                  >
+                    {[6, 12, 24, 48, 72]
+                      .filter(hours => hours <= loadTimeframe)
+                      .map(hours => (
+                        <option key={hours} value={hours}>{hours} hours</option>
+                      ))
+                  }
+                  </select>
+                </div>
+                <button
+                  onClick={handleSummarize}
+                  disabled={loading || summarizing}
+                  className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors"
+                >
+                  Summarize with AI ✨
+                </button>
+              </>
             )}
           </div>
 
