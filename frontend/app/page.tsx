@@ -1,6 +1,7 @@
 'use client'
 
 import ImageModal from '@/components/ImageModal'
+import ResizableSidebar from '@/components/ResizableSidebar'
 import VideoModal from '@/components/VideoModal'
 import { Channel, Summary } from '@/types/discord'
 import { useEffect, useState } from 'react'
@@ -109,34 +110,34 @@ export default function Home() {
     setDisplayedMessages([]);
     
     try {
-        const eventSource = new EventSource(`http://localhost:8000/api/scrape/${selectedChannel}`);
-        
-        eventSource.onmessage = (event) => {
-            const newMessages = JSON.parse(event.data);
-            setAllMessages(prevMessages => {
-                const updatedMessages = [...prevMessages, ...newMessages].sort((a, b) => 
-                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                );
-                setDisplayedMessages(updatedMessages.slice(0, displayLimit));
-                return updatedMessages;
-            });
-        };
-        
-        eventSource.onerror = (error) => {
-            console.error('EventSource error:', error);
-            eventSource.close();
-            setLoading(false);
-        };
-        
-        eventSource.addEventListener('complete', () => {
-            eventSource.close();
-            setLoading(false);
+      const eventSource = new EventSource(`http://localhost:8000/api/scrape/${selectedChannel}`);
+      
+      eventSource.onmessage = (event) => {
+        const newMessages = JSON.parse(event.data);
+        setAllMessages(prevMessages => {
+          const updatedMessages = [...prevMessages, ...newMessages].sort((a, b) => 
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          setDisplayedMessages(updatedMessages.slice(0, displayLimit));
+          return updatedMessages;
         });
-        
-    } catch (error) {
-        console.error('Error scraping messages:', error);
-        alert(`Error scraping messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      };
+      
+      eventSource.onerror = (error) => {
+        console.error('EventSource error:', error);
+        eventSource.close();
         setLoading(false);
+      };
+      
+      eventSource.addEventListener('complete', () => {
+        eventSource.close();
+        setLoading(false);
+      });
+      
+    } catch (error) {
+      console.error('Error scraping messages:', error);
+      alert(`Error scraping messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setLoading(false);
     }
   }
 
@@ -369,53 +370,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-gray-100 flex relative">
-      {/* Sidebar Toggle Button */}
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="absolute top-4 left-4 z-50 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-        title={isSidebarOpen ? "Hide history" : "Show history"}
-      >
-        {isSidebarOpen ? (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          </svg>
-        ) : (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-          </svg>
-        )}
-      </button>
-
-      {/* Update the sidebar div with conditional classes */}
-      <div className={`
-        w-80 border-r border-gray-700 h-screen overflow-y-auto sticky top-0 p-4 
-        bg-gray-800/50 backdrop-blur-sm transition-all duration-300 ease-in-out
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <div className="mt-12"> {/* Add margin-top to account for toggle button */}
-          <h2 className="text-xl font-medium text-gray-200 mb-4">Summary History</h2>
-          <div className="space-y-4">
-            {summaryHistory.map((sum, index) => (
-              <div 
-                key={index} 
-                className="p-4 rounded-lg bg-gray-800 border border-gray-700 cursor-pointer hover:bg-gray-700/50 transition-colors"
-                onClick={() => setSelectedHistorySummary(sum)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-sm font-medium text-gray-300">{sum.channelName}</span>
-                  <span className="text-xs text-gray-400">
-                    {new Date(sum.timestamp).toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-300 line-clamp-3">{sum.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Update the main content div with conditional padding */}
-      <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'pl-0' : 'pl-0'}`}>
+      <ResizableSidebar
+        summaryHistory={summaryHistory}
+        onSelectSummary={setSelectedHistorySummary}
+      />
+      
+      <div className="flex-1">
         <div className="max-w-5xl mx-auto p-6 sm:p-8">
           <h1 className="text-3xl font-bold mb-8 text-center bg-clip-text text-gray-200">
             NewsNow
@@ -514,9 +474,11 @@ export default function Home() {
                   {allMessages.length}
                 </span>
               </h2>
-              <div className="space-y-4">
+              
+              <div className="space-y-6">
                 {displayedMessages.map((msg) => renderMessage(msg))}
               </div>
+              
               {allMessages.length > displayedMessages.length && (
                 <button
                   onClick={handleLoadMore}
