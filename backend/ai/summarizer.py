@@ -55,29 +55,29 @@ async def generate_summary(messages: List[dict]) -> str:
     prompt = f"""You are a news analyst specializing in clear, structured summaries. Below are news updates from the last {hours_diff} hours. 
 Please provide a summary in the following strict format:
 
-[Main Topic/Region] Update - [Current Date]
+Main Topic/Region Update - Current Date
 
 Overview:
 Write a focused 5-7 sentence overview covering the most significant developments. If there are multiple unrelated but important developments, mention them all briefly.
 
 Key Developments:
 
-[Primary Event/Topic]:
+Primary Event/Topic:
 - Detailed point with specific facts (numbers, names, locations)
 - Another specific point with clear impact or significance
 - Additional key detail with concrete information
 
-[Secondary Developments]:
+Secondary Developments:
 - Important but separate development with specific details
 - Another significant but unrelated event
 - Additional noteworthy development from different area/topic
 
-[Tertiary Developments]:
+Tertiary Developments:
 - Additional development from different area/topic
 - Another significant but unrelated event
 - Additional noteworthy development from different area/topic
 
-[Additional Details/Impact]:
+Additional Details/Impact:
 - Clear, factual point with specific information
 - Another detailed development
 - Another detailed development
