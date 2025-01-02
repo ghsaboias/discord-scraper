@@ -45,52 +45,34 @@ async def generate_summary(messages: List[dict]) -> str:
     """Generate a summary of the messages using Claude"""
     formatted_text = format_messages_for_summary(messages)
     
-    # Calculate the timeframe of the messages
     timestamps = [datetime.fromisoformat(msg['timestamp'].rstrip('Z')).replace(tzinfo=timezone.utc) 
                  for msg in messages]
     oldest = min(timestamps)
     newest = max(timestamps)
     hours_diff = round((newest - oldest).total_seconds() / 3600, 1)
     
-    prompt = f"""You are a news analyst specializing in clear, structured summaries. Below are news updates from the last {hours_diff} hours. 
-Please provide a summary in the following strict format:
+    prompt = f"""You are a professional news editor specializing in concise, journalistic summaries. Below are news updates from the last {hours_diff} hours.
 
-Main Topic/Region Update - Current Date
+Create a news summary following this structure:
 
-Overview:
-Write a focused 5-7 sentence overview covering the most significant developments. If there are multiple unrelated but important developments, mention them all briefly.
+Headline
+LOCATION - Write a clear, impactful lead paragraph that captures the most important development. Include key facts like numbers, names, and dates.
 
-Key Developments:
-
-Primary Event/Topic:
-- Detailed point with specific facts (numbers, names, locations)
-- Another specific point with clear impact or significance
-- Additional key detail with concrete information
-
-Secondary Developments:
-- Important but separate development with specific details
-- Another significant but unrelated event
-- Additional noteworthy development from different area/topic
-
-Tertiary Developments:
-- Additional development from different area/topic
-- Another significant but unrelated event
-- Additional noteworthy development from different area/topic
-
-Additional Details/Impact:
-- Clear, factual point with specific information
-- Another detailed development
-- Another detailed development
-- Another detailed development
+Follow with an appropriate number of paragraphs that:
+- Provide essential context and immediate implications
+- Include relevant reactions from key figures or organizations
+- Add important secondary developments, even if unrelated
+- Use specific facts, numbers, and quotes where relevant
 
 Guidelines:
-- Primary category should cover the main event/crisis
-- Secondary Developments category must include other significant events, even if unrelated
-- Each bullet point must contain specific facts (numbers, names, locations)
-- Include both major developments and significant tangential events
-- Maintain clear cause-and-effect relationships
-- Avoid vague language or speculation
-- Keep a neutral, analytical tone
+- Write in clear, journalistic style (AP style)
+- Lead with the most newsworthy information
+- Keep paragraphs short and focused
+- Use active voice
+- Include specific details while remaining concise
+- Maintain neutral tone
+- Cover both primary news and significant secondary developments
+- Include all relevant information
 
 News Updates to Summarize:
 {formatted_text}
@@ -102,13 +84,13 @@ Summary:"""
             model="claude-3-5-haiku-20241022",
             max_tokens=2500,
             temperature=0,
-            system="""You are an expert news analyst that creates clear, structured summaries.
-Focus on specific facts and concrete details.
-Avoid vague language like 'multiple', 'various', or 'several'.
-Use precise numbers, names, and locations whenever possible.
-Include both primary events and significant secondary developments.
-Ensure no important information is omitted, even if it seems tangential.
-Maintain consistent formatting and professional tone.""",
+            system="""You are an expert news editor that creates concise, journalistic summaries.
+            Write in clear AP style with strong leads.
+            Focus on specific facts and concrete details.
+            Lead with the most newsworthy information.
+            Include both primary developments and significant secondary events.
+            Keep writing tight and focused while maintaining context.
+            Use active voice and journalistic tone.""",
             messages=[
                 {
                     "role": "user",
